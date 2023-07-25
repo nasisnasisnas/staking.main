@@ -1,0 +1,79 @@
+mkdir staking_contract
+cd staking_contract
+truffle init
+npm install @openzeppelin/contracts truffle-hdwallet-provider @truffle/hdwallet-provider dotenv
+MNEMONIC=YOUR_METAMASK_MNEMONIC
+BSCSCAN_API_KEY=YOUR_BSCSCAN_API_KEY
+const HDWalletProvider = require('@truffle/hdwallet-provider');
+require('dotenv').config();
+
+module.exports = {
+  networks: {
+    development: {
+      host: "127.0.0.1",
+      port: 7545,
+      network_id: "*", // Match any network ID
+    },
+    bscTestnet: {
+      provider: () => new HDWalletProvider(process.env.MNEMONIC, "https://data-seed-prebsc-2-s3.binance.org:8545"),
+      network_id: 97,
+      gas: 6000000,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+    },
+  },
+  compilers: {
+    solc: {
+      version: "0.8.7",
+    },
+  },
+};
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract Staking {
+    IERC20 public bnbToken;
+    uint256 public totalStaked;
+    mapping(address => uint256) public stakedBalance;
+
+    event Staked(address indexed staker, uint256 amount);
+    event Withdrawn(address indexed staker, uint256 amount);
+
+    constructor(address _bnbToken) {
+        bnbToken = IERC20(_bnbToken);
+    }
+
+    function stake(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        require(bnbToken.transferFrom(msg.sender, address(this), amount), "Transfer failed");
+        
+        stakedBalance[msg.sender] += amount;
+        totalStaked += amount;
+        emit Staked(msg.sender, amount);
+    }
+
+    function withdraw() external {
+        uint256 amount = stakedBalance[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+
+        stakedBalance[msg.sender] = 0;
+        totalStaked -= amount;
+        require(bnbToken.transfer(msg.sender, amount), "Transfer failed");
+        emit Withdrawn(msg.sender, amount);
+    }
+}
+truffle compile
+truffle migrate --network bscTestnet
+truffle console --network bscTestnet
+// Get the deployed contract instance
+let instance;
+Staking.deployed().then((contract) => { instance = contract; });
+
+// Replace 'YOUR_BNB_AMOUNT' with the amount of BNB you want to stake
+instance.stake(web3.utils.toWei('YOUR_BNB_AMOUNT', 'ether')).then((result) => { console.log(result); });
+
+// Withdraw staked BNB
+instance.withdraw().then((result) => { console.log(result); });
